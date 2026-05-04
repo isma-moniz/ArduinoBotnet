@@ -4,7 +4,7 @@
 
 docker buildx build \
 	--platform linux/arm64 \
-	-t dev1_httpd:arm64 \
+	-t dev3_telnetd:arm64 \
 	--load .
 
-sudo docker run --rm -it --platform=linux/arm64 --name dev1 -p 8080:80 dev1_httpd:arm64
+sudo docker run -it --platform=linux/arm64 --name dev3 dev3_telnetd:arm64
