@@ -85,5 +85,6 @@ void print_usage(char* pname);
 char* getentry(FILE* fd, char* line);
 uint8_t getrecord(FILE* fd_user, char* username, FILE* fd_pass, char* password);
 uint8_t trycredentials(int sockfd, char *username, char *password);
-ssize_t receive(int sockfd, void *buf, size_t len, int flags);
 void negotiate(int sock, unsigned char* buf, int len);
+ssize_t sendch(int sockfd, char* buf_all);
+int parse(char* buff, int type);

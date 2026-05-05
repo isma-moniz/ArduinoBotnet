@@ -265,17 +265,17 @@ uint8_t trycredentials(int sockfd, char *username, char *password) {
 		// wait for fds to be ready for reading
 		if ( (selected_fds = select(sockfd + 1, &fds, (fd_set*) 0, (fd_set*) 0, &tval)) < 0) {
 			perror("select error\n");
-			return 1;
+			return 4;
 		}
 
 		else if (sockfd != 0 && FD_ISSET(sockfd, &fds)) {
-			if (!(rc = receive(sockfd, buf, 1, 0))) {
+			if ((rc = recv(sockfd, buf, 1, 0)) < 0) {
 				printf("Connection closed by local host!\n");
 				return 2;
 			}
 
 			if (buf[0] == CMD) {
-				if(!(rc = receive(sockfd, (buf + 1), 2, 0))) {
+				if((rc = recv(sockfd, (buf + 1), 2, 0)) < 0) {
 					printf("Connection closed by the remote host!\n");
 					return 2;
 				}
@@ -293,17 +293,106 @@ uint8_t trycredentials(int sockfd, char *username, char *password) {
 		} else if (!(FD_ISSET(sockfd, &fds))) {
 			if ((level = parse((char*)buff_r, flag)) > 0){
 				switch(level) {
-					case 1: { sendch(sockfd, username); break; } // send login
-					case 2: { sendch(sockfd, password); break; } // send password
+					case 1: { 
+						if ((rc = sendch(sockfd, username)) < 0) {
+							printf("sendch error\n");
+							return 4;
+						}
+						break;
+						} // send login
+					case 2: { 
+						if ((rc = sendch(sockfd, password)) < 0 ) {
+							printf("sendch error\n");
+							return 4;
+						}
+						break;
+						} // send password
 					case 3: return 0; // got prompt :)
 					default: break;
 				}
-				flag = level;
+				flag = level; //TODO: this is useless from what i can see so far
 			} else {
 				if (parse((char*)buff_r, 3) == 4) {
 					return 1; // bad creds, no login :/
 				}
 			}
 		}
+	}
+}
+
+ssize_t sendch(int sockfd, char* buf_all) {
+	char buf[1];
+	int i;
+	ssize_t rc;
+
+	for (i = 0; i < strlen(buf_all); i++) {
+		buf[0] = buf_all[i];
+		if ((rc = send(sockfd, buf, 1, 0)) < 0) {
+			return rc;
+		}
+	}
+
+	buf[0] = '\r';
+	rc = send(sockfd, buf, 1, 0);
+	return rc;
+}
+
+int parse(char* buff, int type) {
+	char *KNOWN_LOGIN[KNOWN_LOGIN_SIZE] = { "ogin:", "last login", "sername" };
+	char *KNOWN_PSW[KNOWN_PSW_SIZE] = { "asswor", "asscode", "ennwort" };
+	char *KNOWN_PRT[KNOWN_PRT_SIZE] = { "?", "/", ">", "%", "$", "#" };
+	char *KNOWN_BAD[KNOWN_BAD_SIZE] = { "incorrect", "bad log", "no log" };
+
+	int i;
+	int p_size[4];
+	char **p_known[4];
+
+	p_size[0] = KNOWN_LOGIN_SIZE;
+	p_size[1] = KNOWN_PSW_SIZE;
+	p_size[2] = KNOWN_PRT_SIZE;
+	p_size[3] = KNOWN_BAD_SIZE;
+
+	p_known[0] = (char **)&KNOWN_LOGIN;
+	p_known[1] = (char **)&KNOWN_PSW;
+	p_known[2] = (char **)&KNOWN_PRT;
+	p_known[3] = (char **)&KNOWN_BAD;
+
+	for (i = 0; i < p_size[type]; i++) {
+		if (strcasestr(buff, p_known[type][i]) != NULL)
+			return (type+1);
+	}
+
+	return -1;
+}
+
+void negotiate(int sock, unsigned char* buf, int len) {
+	unsigned char str_term[2][10] = {
+		{ 255, 251, 31 },
+		{255, 250, 31, 0, 80, 0, 24, 255, 240}
+	};
+	int i;
+	ssize_t rc;
+
+	if (buf[1] == DO && buf[2] == CMD_WINDOW_SIZE) {
+		if ((rc = send(sock, str_term[0], 3, 0)) < 0) {
+			perror("send error in negotiate");
+			return;
+		}
+		if ((rc = send(sock, str_term[1], 9, 0)) < 0) {
+			perror("send error in negotiate");
+		}
+
+		return;
+	}
+
+	for (i = 0; i < len; i++) {
+		if (buf[i] == DO)
+			buf[i] = WONT;
+		else if(buf[i] == WILL)
+			buf[i] = DO;
+	}
+
+	if ((rc = send(sock, buf, len, 0)) < 0) {
+		perror("send error in negotiate");
 	}
 }
