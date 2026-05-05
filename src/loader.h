@@ -58,6 +58,19 @@
 #include <stdio.h>
 
 #define BIGLINE 32 // let's try to avoid using this
+#define DO 0xfd
+#define WONT 0xfc
+#define WILL 0xfb
+#define DONT 0xfe
+#define CMD 0xff
+#define CMD_ECHO 1
+#define CMD_WINDOW_SIZE 31
+#define BUFLEN 20
+#define BUFF_R_SIZE 2048
+#define KNOWN_LOGIN_SIZE 3
+#define KNOWN_PSW_SIZE 3
+#define KNOWN_PRT_SIZE 6
+#define KNOWN_BAD_SIZE 3
 
 struct telnet_config {
 	struct addrinfo *tel_addr;
@@ -72,3 +85,5 @@ void print_usage(char* pname);
 char* getentry(FILE* fd, char* line);
 uint8_t getrecord(FILE* fd_user, char* username, FILE* fd_pass, char* password);
 uint8_t trycredentials(int sockfd, char *username, char *password);
+ssize_t receive(int sockfd, void *buf, size_t len, int flags);
+void negotiate(int sock, unsigned char* buf, int len);
