@@ -62,6 +62,7 @@
 #include <string.h>
 #include <pthread.h>
 #include <time.h>
+#include <unistd.h>
 
 void print_usage(char* pname) {
 	printf("\nUsage: %s <target ip> <port> <userfile> <passfile> <n thread> [options]\n\n"
@@ -169,6 +170,16 @@ int main(int argc, char *argv[]) {
 		i++;
 	}
 finish: //TODO: complete this
+
+	for(int wt=0; wt<n_threads; wt++) {
+		if(tdata[wt].tforked == 1)
+			if(pthread_join(thread_ids[wt], NULL)) {
+				perror("pthread_join");
+				exit(-1);
+			}
+	}
+	fclose(fd_user);
+	fclose(fd_pass);
 	freeaddrinfo(tel_addr);
 	return 0;
 }
@@ -238,7 +249,12 @@ void* t_conn(void* t_args) {
 		return NULL;
 	}
 
-	//TODO:if (!trycredentials())
+	if (!trycredentials(sockfd, tdata->username, tdata->password)) {
+		printf("[LOGIN FOUND] %s:%s\n", tdata->username, tdata->password);
+		*tdata->found = 1;
+	}
+
+	close(sockfd);
 	tdata->tforked = 0;
 
 	pthread_exit(NULL);
