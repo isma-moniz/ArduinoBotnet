@@ -57,8 +57,10 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <netdb.h>
+#include <arpa/inet.h>
 #include <netinet/in.h>
 #include <string.h>
+#include <pthread.h>
 
 void print_usage(char* pname) {
 	printf("\nUsage: %s <target ip> <port> <userfile> <passfile> <n thread> [options]\n\n"
@@ -102,7 +104,12 @@ int main(int argc, char *argv[]) {
 		perror("getaddrinfo error\n");
 		return 1;
 	}
-	
+
+	if (tel_addr->ai_family == AF_INET6) {
+		freeaddrinfo(tel_addr);
+		perror("Only ipv4 is supported.\n");
+		return 1;
+	}
 	// initialize thread data
 	for (int i = 0; i < n_threads; ++i) {
 
@@ -139,10 +146,28 @@ int main(int argc, char *argv[]) {
 		if (tdata[i].tforked == 0) {
 			tdata[i].tforked = 1; // set busy
 			
-			// if ( (getrecord) ) *WIP*
-		}
-	}
+			if (getrecord(fd_user, username, fd_pass, password) != 0) {
+				goto finish;
+			}
+			
+			// does each thread really need to own their own copy of username and password?
+			if ( (tdata[i].username = (char*)malloc((strlen(username) + 1))) == NULL ) {
+				perror("malloc error\n");
+				freeaddrinfo(tel_addr);
+				return 1;
+			}
+			strcpy(tdata[i].username, username);
 
+			if ( (tdata[i].password = (char*)malloc((strlen(password) + 1))) == NULL ) {
+				perror("malloc error\n");
+				freeaddrinfo(tel_addr);
+				return 1;
+			}
+			strcpy(tdata[i].password, password);
+		}
+		i++;
+	}
+finish: //TODO: complete this
 	freeaddrinfo(tel_addr);
 	return 0;
 }
@@ -184,4 +209,40 @@ uint8_t getrecord(FILE* fd_user, char* username, FILE* fd_pass, char* password) 
 		}
 	}
 	return 0;
+}
+
+void* t_conn(void* t_args) {
+	struct telnet_config* tdata = (struct telnet_config*)t_args;
+	int sockfd;
+	char ipstr[INET_ADDRSTRLEN];
+
+	// safe as long as only ipv4 is supported explicitly
+	struct sockaddr_in* ipv4 = (struct sockaddr_in *)tdata->tel_addr->ai_addr;
+	struct sockaddr* sock = tdata->tel_addr->ai_addr;
+	if (tdata->verbose == 1) {
+		printf("telnet://%s@%s:%d %s\n",
+				tdata->username,
+				inet_ntop(tdata->tel_addr->ai_family, (void*)&ipv4->sin_addr, ipstr, sizeof(ipstr)),
+				tdata->tel_addr->ai_protocol,
+				tdata->password);
+	}
+
+	if ( (sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+		perror("socket creation error\n");
+		return NULL;
+	}
+
+	if ( (connect(sockfd, sock, sizeof(*socket))) < 0) {
+		perror("socket connection error\n");
+		return NULL;
+	}
+
+	//TODO:if (!try_credentials())
+	tdata->tforked = 0;
+
+	pthread_exit(NULL);
+}
+
+uint8_t trycredentials(int sockfd, char *username, char *password) {
+
 }

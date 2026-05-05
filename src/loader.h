@@ -71,3 +71,4 @@ struct telnet_config {
 void print_usage(char* pname);
 char* getentry(FILE* fd, char* line);
 uint8_t getrecord(FILE* fd_user, char* username, FILE* fd_pass, char* password);
+uint8_t trycredentials(int sockfd, char *username, char *password);
