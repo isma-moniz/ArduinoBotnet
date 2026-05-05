@@ -89,6 +89,8 @@ int main(int argc, char *argv[]) {
 		return(1);
 	}
 	printf("[+] Target: %s:%s\n", argv[1], argv[2]);
+	printf("Username wordlist: %s\n", argv[3]);
+	printf("Password wordlist: %s\n", argv[4]);
 
 	int n_threads = atoi(argv[5]);
 
@@ -166,6 +168,10 @@ int main(int argc, char *argv[]) {
 				return 1;
 			}
 			strcpy(tdata[i].password, password);
+
+			if (pthread_create(&thread_ids[i], NULL, t_conn, (void*)&tdata[i])) {
+				perror("pthread_create error\n");
+			}
 		}
 		i++;
 	}
@@ -174,7 +180,7 @@ finish: //TODO: complete this
 	for(int wt=0; wt<n_threads; wt++) {
 		if(tdata[wt].tforked == 1)
 			if(pthread_join(thread_ids[wt], NULL)) {
-				perror("pthread_join");
+				perror("pthread_join error\n");
 				exit(-1);
 			}
 	}
@@ -193,15 +199,17 @@ char* getentry(FILE* fd, char* line) {
 		if ( (cut = strchr(line, '\n')) ) {
 			*cut = '\0';
 		}
-		return line;
+		printf("Parsed: %s\n", line); //DEBUG
+	} else {
+		line[0] = '\0';
 	}
 
-	return NULL;
+	return line;
 }
 
 uint8_t getrecord(FILE* fd_user, char* username, FILE* fd_pass, char* password) {
 	if (getentry(fd_pass, password) == NULL) {
-		perror("password io error\n");
+		perror("password io error 1\n");
 		return 1;
 	}
 
@@ -216,7 +224,7 @@ uint8_t getrecord(FILE* fd_user, char* username, FILE* fd_pass, char* password) 
 		}
 		fseek(fd_pass, 0, SEEK_SET);
 		if (getentry(fd_pass, password) == NULL) {
-			perror("password io error\n");
+			perror("password io error 2\n");
 			return 1;
 		}
 	}
@@ -244,7 +252,7 @@ void* t_conn(void* t_args) {
 		return NULL;
 	}
 
-	if ( (connect(sockfd, sock, sizeof(*socket))) < 0) {
+	if ( (connect(sockfd, sock, sizeof(*sock))) < 0) {
 		perror("socket connection error\n");
 		return NULL;
 	}
