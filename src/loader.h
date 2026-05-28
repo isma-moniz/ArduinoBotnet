@@ -55,6 +55,7 @@
 #include <netdb.h>
 #include <netinet/in.h>
 #include <stdlib.h>
+#include <pthread.h>
 #include <stdio.h>
 
 #define BIGLINE 32 // let's try to avoid using this
@@ -79,6 +80,8 @@ struct telnet_config {
 	uint8_t* found;
 	uint8_t verbose;
 	uint16_t tforked;
+	pthread_mutex_t lock;
+	pthread_cond_t done;
 };
 
 void print_usage(char* pname);

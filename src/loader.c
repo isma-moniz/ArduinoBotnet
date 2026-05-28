@@ -120,8 +120,10 @@ int main(int argc, char *argv[]) {
 		// tel_addr is read only afaik, so all threads can share the same heap allocated one
 		tdata[i].tel_addr = tel_addr;
 		tdata[i].found = &found;
-		tdata[i].tforked = 0;
 		tdata[i].verbose = verbose;
+		pthread_mutex_init(&tdata[i].lock, NULL);
+		pthread_cond_init(&tdata[i].done, NULL);
+		tdata[i].tforked = 0;
 	}
 
 	username = line_user;
@@ -143,40 +145,30 @@ int main(int argc, char *argv[]) {
 
 	int i = 0;
 	while (!found) {
-		if (i == n_threads) {
-			i = 0;
+		if (++i >= n_threads) i = 0;
+		pthread_mutex_lock(&tdata[i].lock);
+		while (tdata[i].tforked == 1) {
+			pthread_cond_wait(&tdata[i].done, &tdata[i].lock);
 		}
-
-		if (tdata[i].tforked == 0) {
-			tdata[i].tforked = 1; // set busy
 			
-			if (getrecord(fd_user, username, fd_pass, password) != 0) {
-				goto finish;
-			}
-			
-			// does each thread really need to own their own copy of username and password?
-			if ( (tdata[i].username = (char*)malloc((strlen(username) + 1))) == NULL ) {
-				perror("malloc error\n");
-				freeaddrinfo(tel_addr);
-				return 1;
-			}
-			strcpy(tdata[i].username, username);
+		if (getrecord(fd_user, username, fd_pass, password) != 0) {
+			pthread_mutex_unlock(&tdata[i].lock);
+			goto finish;
+		}
+		
+		// TODO: this needs to be freed
+		tdata[i].username = strdup(username);
+		tdata[i].password = strdup(password);
 
-			if ( (tdata[i].password = (char*)malloc((strlen(password) + 1))) == NULL ) {
-				perror("malloc error\n");
-				freeaddrinfo(tel_addr);
-				return 1;
-			}
-			strcpy(tdata[i].password, password);
-
-			if (pthread_create(&thread_ids[i], NULL, t_conn, (void*)&tdata[i])) {
-				perror("pthread_create error\n");
-			}
+		tdata[i].tforked = 1; // set busy
+		pthread_mutex_unlock(&tdata[i].lock);
+		if (pthread_create(&thread_ids[i], NULL, t_conn, (void*)&tdata[i])) {
+			perror("pthread_create error\n");
+			goto finish;
 		}
 		i++;
 	}
 finish: //TODO: complete this
-
 	for(int wt=0; wt<n_threads; wt++) {
 		if(tdata[wt].tforked == 1)
 			if(pthread_join(thread_ids[wt], NULL)) {
@@ -249,12 +241,12 @@ void* t_conn(void* t_args) {
 
 	if ( (sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
 		perror("socket creation error\n");
-		return NULL;
+		goto tfinish;
 	}
 
 	if ( (connect(sockfd, sock, sizeof(*sock))) < 0) {
 		perror("socket connection error\n");
-		return NULL;
+		goto tfinish;
 	}
 
 	if (!trycredentials(sockfd, tdata->username, tdata->password)) {
@@ -263,7 +255,14 @@ void* t_conn(void* t_args) {
 	}
 
 	close(sockfd);
+tfinish:
+	free(tdata->username);
+	free(tdata->password);
+	
+	pthread_mutex_lock(&tdata->lock);
 	tdata->tforked = 0;
+	pthread_cond_signal(&tdata->done); // wake up main thread
+	pthread_mutex_unlock(&tdata->lock);
 
 	pthread_exit(NULL);
 }
