@@ -62,8 +62,10 @@
 #include <string.h>
 #include <pthread.h>
 #include <time.h>
+#include <stdatomic.h>
 #include <unistd.h>
 
+uint8_t verbose = 0;
 void print_usage(char* pname) {
 	printf("\nUsage: %s <target ip> <port> <userfile> <passfile> <n thread> [options]\n\n"
 		   "<userfile>\tUsername wordlist\n"
@@ -76,7 +78,7 @@ void print_usage(char* pname) {
 
 int main(int argc, char *argv[]) {
 	char *username, *password;
-	uint8_t verbose = 0, found = 0;
+	_Atomic int found = 0;
 	char line_user[BIGLINE];
 	char line_password[BIGLINE];
 	FILE *fd_user, *fd_pass;
@@ -97,11 +99,14 @@ int main(int argc, char *argv[]) {
 	struct telnet_config tdata[n_threads];
 	pthread_t thread_ids[n_threads];
 
-	if( (argc == 7) && (!strcmp(argv[6], "-v")) ) {
-		verbose = 1;
-	} else {
-		print_usage(argv[1]);
-		return(1);
+	if(argc == 7) {
+		if (!strcmp(argv[6], "-v")) {
+			verbose = 1;
+		}
+		else {
+			print_usage(argv[1]);
+			return(1);
+		}
 	}
 
 	if (getaddrinfo(argv[1], argv[2], NULL, &tel_addr) < 0) {
@@ -144,11 +149,17 @@ int main(int argc, char *argv[]) {
 	}
 
 	int i = 0;
-	while (!found) {
+	while (!(atomic_load(&found) == 1)) {
 		if (++i >= n_threads) i = 0;
 		pthread_mutex_lock(&tdata[i].lock);
 		while (tdata[i].tforked == 1) {
 			pthread_cond_wait(&tdata[i].done, &tdata[i].lock);
+		}
+	
+		// recheck after potentially sleeping
+		if (atomic_load(&found) == 1) {
+			pthread_mutex_unlock(&tdata[i].lock);
+			goto finish;
 		}
 			
 		if (getrecord(fd_user, username, fd_pass, password) != 0) {
@@ -191,7 +202,7 @@ char* getentry(FILE* fd, char* line) {
 		if ( (cut = strchr(line, '\n')) ) {
 			*cut = '\0';
 		}
-		printf("Parsed: %s\n", line); //DEBUG
+		if (verbose) printf("Parsed: %s\n", line);
 	} else {
 		line[0] = '\0';
 	}
@@ -211,7 +222,7 @@ uint8_t getrecord(FILE* fd_user, char* username, FILE* fd_pass, char* password) 
 			return 1;
 		}
 		if (username[0] == '\0') {
-			perror("no more credentials to try\n");
+			printf("no more credentials to parse\n");
 			return 1;
 		}
 		fseek(fd_pass, 0, SEEK_SET);
@@ -231,7 +242,7 @@ void* t_conn(void* t_args) {
 	// safe as long as only ipv4 is supported explicitly
 	struct sockaddr_in* ipv4 = (struct sockaddr_in *)tdata->tel_addr->ai_addr;
 	struct sockaddr* sock = tdata->tel_addr->ai_addr;
-	if (tdata->verbose == 1) {
+	if (1 || tdata->verbose == 1) { // i wanna print anyways for now
 		printf("telnet://%s@%s:%d %s\n",
 				tdata->username,
 				inet_ntop(tdata->tel_addr->ai_family, (void*)&ipv4->sin_addr, ipstr, sizeof(ipstr)),
@@ -251,7 +262,7 @@ void* t_conn(void* t_args) {
 
 	if (!trycredentials(sockfd, tdata->username, tdata->password)) {
 		printf("[LOGIN FOUND] %s:%s\n", tdata->username, tdata->password);
-		*tdata->found = 1;
+		atomic_store(tdata->found, 1);
 	}
 
 	close(sockfd);
@@ -305,12 +316,12 @@ uint8_t trycredentials(int sockfd, char *username, char *password) {
 				negotiate(sockfd, buf, 3);
 			} else {
 				buf[1] = '\0';
-				printf("%s", buf); // DEBUG
+				if (verbose) printf("%s", buf); // DEBUG
 				
 				if (strlen((const char*) buff_r) < (BUFF_R_SIZE - 2))
 					strcat((char*)buff_r, (const char*) buf);
 				else
-					printf("[ERROR] Overload of buff_r for parsing! Resizing BUFF_R_SIZE might be necessary.");
+					printf("[ERROR] Overload of buff_r for parsing! Resizing BUFF_R_SIZE might be necessary.\n");
 				fflush(0);
 			}
 		} else if (!(FD_ISSET(sockfd, &fds))) {
@@ -330,7 +341,8 @@ uint8_t trycredentials(int sockfd, char *username, char *password) {
 						}
 						break;
 						} // send password
-					case 3: return 0; // got prompt :)
+					case 3:
+						return 0; // got prompt :)
 					default: break;
 				}
 				flag = level; //TODO: this is useless from what i can see so far
