@@ -49,6 +49,7 @@
  * For compile: gcc -o brute_telnet brute_telnet.c -pthread
  *
  */
+#define _GNU_SOURCE
 #include "loader.h"
 
 #include <stdlib.h>

