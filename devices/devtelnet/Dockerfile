@@ -2,7 +2,7 @@ FROM ubuntu:20.04
 
 # install necessary packages
 RUN apt-get update -y && \
-	apt-get install -y sudo telnetd systemctl curl && \
+	apt-get install -y sudo telnetd systemctl curl python && \
 	apt-get clean
 
 RUN adduser -gecos --disabled-password --shell /bin/bash telnet
