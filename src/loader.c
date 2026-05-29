@@ -66,6 +66,9 @@
 #include <unistd.h>
 
 uint8_t verbose = 0;
+struct timespec start, finish;
+double elapsed;
+
 void print_usage(char* pname) {
 	printf("\nUsage: %s <target ip> <port> <userfile> <passfile> <n thread> [options]\n\n"
 		   "<userfile>\tUsername wordlist\n"
@@ -119,7 +122,9 @@ int main(int argc, char *argv[]) {
 		perror("Only ipv4 is supported.\n");
 		return 1;
 	}
-	// initialize thread data
+	// initialize thread data and start counting
+	
+	clock_gettime(CLOCK_MONOTONIC, &start);
 	for (int i = 0; i < n_threads; ++i) {
 
 		// tel_addr is read only afaik, so all threads can share the same heap allocated one
@@ -190,6 +195,10 @@ finish: //TODO: complete this
 	fclose(fd_user);
 	fclose(fd_pass);
 	freeaddrinfo(tel_addr);
+
+	elapsed = (finish.tv_sec - start.tv_sec);
+	elapsed += (finish.tv_nsec - start.tv_nsec) / 1000000000.0;
+	printf("Done in %.2f seconds\n", elapsed);
 	return 0;
 }
 
@@ -342,6 +351,7 @@ uint8_t trycredentials(int sockfd, char *username, char *password) {
 						break;
 						} // send password
 					case 3:
+						clock_gettime(CLOCK_MONOTONIC, &finish);
 						return 0; // got prompt :)
 					default: break;
 				}
