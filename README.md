@@ -22,5 +22,5 @@ even to the initial one. Simply runs the C executables and stores results and wh
     - [ ] agent.sh signals the device as infected to the server (the server should do this upon receiving a get request from an agent with the id)
 
 - [x] Scanner -> scans for ips in subnet and tests if they have port 23 open (telnet default)
-    - [ ] Reports them to report.py collection server in a similar manner to loader 
+    - [x] Reports them to report.py collection server in a similar manner to loader 
     - [ ] dispatcher.py calls loader on non-bruted scanned devices
