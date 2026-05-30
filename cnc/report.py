@@ -14,7 +14,7 @@ import signal
 import sys
 import os
 
-HOST = "0.0.0.0"
+HOST = "172.18.0.1" # docker bridge
 PORT = int(os.getenv("REPORT_PORT", 5000))
 DB   = os.getenv("DB_PATH", "botnet.db")
 
