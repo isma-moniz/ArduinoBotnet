@@ -12,7 +12,7 @@ LOADER_SRCS := loader.c
 SCANNER_SRCS := scanner.c
 
 # Compiler settings
-CFLAGS := -Wextra -Wall --pedantic
+CFLAGS := -Wextra -Wall
 LFLAGS_LOADER := -pthread
 
 ifeq ($(debug), 1)

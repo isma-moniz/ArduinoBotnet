@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include "scanner.h"
 #include <arpa/inet.h>
 #include <sys/socket.h>
@@ -8,6 +9,8 @@
 #include <stdlib.h>
 #include <time.h>
 
+const char* report_ip = "172.18.0.1"; // WARNING: hardcoded for now
+const char* report_port = "5000";
 
 static uint32_t random_ip_in_subnet(uint32_t subnet, uint32_t mask) 
 {
@@ -103,9 +106,68 @@ int main(int argc, char* argv[]) {
 		
 		rc = check_open(ip_str, port);
 		if (rc == 0) {
-			// TODO: report
+			report(ip_str);
 		}
     }
 
+	return 0;
+}
+
+ssize_t sendch(int sockfd, char* buf_all) {
+	char buf[1];
+	int i;
+	ssize_t rc;
+
+	for (i = 0; i < strlen(buf_all); i++) {
+		buf[0] = buf_all[i];
+		if ((rc = send(sockfd, buf, 1, 0)) < 0) {
+			return rc;
+		}
+	}
+
+	buf[0] = '\r';
+	rc = send(sockfd, buf, 1, 0);
+	return rc;
+}
+
+int report(char* ip) {
+	struct addrinfo *report_addr;
+	int sockfd;
+	if (getaddrinfo(report_ip ,report_port, NULL, &report_addr) < 0) {
+		perror("getaddrinfo error\n");
+		return 1;
+	}
+
+	struct sockaddr_in* ipv4 = (struct sockaddr_in *)report_addr->ai_addr;
+	struct sockaddr* sock = report_addr->ai_addr;
+
+	if ( (sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+		perror("socket creation error\n");
+	}
+
+	if ( (connect(sockfd, sock, sizeof(*sock))) < 0) {
+		perror("socket connection error\n");
+	}
+
+	size_t len = strlen(ip) + 3;
+	char *report_info = malloc(len);
+	if (!report_info) {
+		perror("malloc error\n");
+		return 1;
+	}
+
+	snprintf(report_info, len, "s:%s", ip);
+
+	int rc;
+	if ((rc = sendch(sockfd, report_info)) < 0) {
+		printf("sendch error on report!\n");
+		return 1;
+	}
+
+	printf("sent %s\n", report_info);
+
+	freeaddrinfo(report_addr);
+	free(report_info);
+	close(sockfd);
 	return 0;
 }

