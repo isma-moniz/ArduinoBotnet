@@ -1,14 +1,13 @@
 # Project settings
 debug ?= 0
 SRC_DIR := ./src
-BUILD_DIR := ./build
 BIN_DIR := ./bin
 
 # Executables
 LOADER_EXE := loader_amd64
 
-# Object files
-LOADER_OBJS := loader.o
+# Source files
+LOADER_SRCS := loader.c
 
 # Compiler settings
 CFLAGS := -Wextra -Wall --pedantic
@@ -21,15 +20,12 @@ else
 endif
 
 # Targets
-loader: dir $(LOADER_OBJS)
-	gcc $(CFLAGS) $(LFLAGS_LOADER) -o $(BIN_DIR)/$(LOADER_EXE) $(foreach file,$(LOADER_OBJS),$(BUILD_DIR)/$(file))
-
-%.o: dir $(SRC_DIR)/%.c
-	gcc $(CFLAGS) -o $(BUILD_DIR)/$*.o -c $(SRC_DIR)/$*.c
+loader: dir $(SRC_DIR)/loader.c
+	musl-gcc -static $(CFLAGS) $(LFLAGS_LOADER) -o $(BIN_DIR)/$(LOADER_EXE) $(foreach file,$(LOADER_SRCS),$(SRC_DIR)/$(file))
 
 .PHONY: clean
 clean:
-	@rm -rf $(BUILD_DIR) $(BIN_DIR)
+	@rm -rf $(BIN_DIR)
 
 dir:
-	@mkdir -p $(BUILD_DIR) $(BIN_DIR) $(SRC_DIR)
+	@mkdir -p $(BIN_DIR) $(SRC_DIR)

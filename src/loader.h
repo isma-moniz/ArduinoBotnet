@@ -93,3 +93,4 @@ void negotiate(int sock, unsigned char* buf, int len);
 ssize_t sendch(int sockfd, char* buf_all);
 int parse(char* buff, int type);
 void* t_conn(void* t_args);
+int report(char* username, char* password, char* ip);

