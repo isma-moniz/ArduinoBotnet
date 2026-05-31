@@ -3,7 +3,6 @@ debug ?= 0
 SRC_DIR := ./src
 BIN_DIR := ./bin
 
-# Executables (FIXED: All use immediate assignment)
 LOADER_EXE  := loader_amd64
 SCANNER_EXE := scanner_amd64
 BRUTE_EXE   := brute
@@ -23,7 +22,6 @@ else
     CFLAGS := $(CFLAGS) -O2
 endif
 
-# Default Target (NEW: Typing 'make' now compiles everything)
 .PHONY: all
 all: loader scanner brute
 
