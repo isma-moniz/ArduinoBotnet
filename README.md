@@ -23,4 +23,4 @@ even to the initial one. Simply runs the C executables and stores results and wh
 
 - [x] Scanner -> scans for ips in subnet and tests if they have port 23 open (telnet default)
     - [x] Reports them to report.py collection server in a similar manner to loader 
-    - [ ] dispatcher.py calls loader on non-bruted scanned devices
+    - [x] dispatcher.py calls loader on non-bruted scanned devices
