@@ -20,11 +20,11 @@ sudo nmcli con modify "$CON_NAME" 802-11-wireless.channel 6
 
 echo "[*] Configuring WPA2 security..."
 sudo nmcli con modify "$CON_NAME" 802-11-wireless-security.key-mgmt wpa-psk
-sudo nmcli con modify "$CON_NAME" 802-11-wireless-security.psk "password123"
+sudo nmcli con modify "$CON_NAME" 802-11-wireless-security.psk "password"
 
-echo "[*] Setting static gateway and shared DHCP..."
-sudo nmcli con modify "$CON_NAME" ipv4.addresses "10.42.0.1/24"
-sudo nmcli con modify "$CON_NAME" ipv4.gateway "10.42.0.1"
+echo "[*] Setting static gateway and shared DHCP on the Docker subnet..."
+sudo nmcli con modify "$CON_NAME" ipv4.addresses "172.18.0.1/24"
+sudo nmcli con modify "$CON_NAME" ipv4.gateway "172.18.0.1"
 sudo nmcli con modify "$CON_NAME" ipv4.method shared
 
 echo "[*] Disabling autoconnect on hotspot..."
@@ -37,7 +37,7 @@ sudo nmcli con up "$CON_NAME"
 sleep 2
 
 echo ""
-echo "[+] Hotspot '$CON_NAME' is active."
+echo "[+] Hotspot '$CON_NAME' is active on the unified subnet."
 echo "[+] Gateway IP:"
 ip addr show "$IFACE" | grep "inet " | awk '{print $2}'
 

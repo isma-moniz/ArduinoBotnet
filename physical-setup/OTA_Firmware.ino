@@ -106,11 +106,10 @@ bool connectWiFi(int timeoutSec = 20, int maxRetries = 5) {
   WiFi.mode(WIFI_STA);
   WiFi.setHostname(HOST_NAME);
   
-  // Force static IP to bypass DHCP entirely
-  IPAddress local_IP(10, 42, 0, 50);
-  IPAddress gateway(10, 42, 0, 1);
+  IPAddress local_IP(172, 18, 0, 50);
+  IPAddress gateway(172, 18, 0, 1);
   IPAddress subnet(255, 255, 255, 0);
-  IPAddress dns(10, 42, 0, 1);
+  IPAddress dns(172, 18, 0, 1);
   
   if (!WiFi.config(local_IP, gateway, subnet, dns)) {
     Serial.println("[WiFi] Static IP config failed.");

