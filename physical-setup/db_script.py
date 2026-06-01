@@ -14,18 +14,6 @@ def init_and_seed():
     
     # 1. Guarantee correct base schema tracking structures are present
     con.execute("""
-        CREATE TABLE IF NOT EXISTS devices (
-            device_id TEXT PRIMARY KEY,
-            ip TEXT,
-            cpu_load REAL,
-            memory REAL,
-            uptime INTEGER,
-            arch TEXT,
-            last_seen TIMESTAMP
-        )
-    """)
-    
-    con.execute("""
         CREATE TABLE IF NOT EXISTS tasks (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             device_id TEXT,
