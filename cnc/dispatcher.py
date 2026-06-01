@@ -118,7 +118,7 @@ def give_instruction(instruction, device_id):
     DO UPDATE SET
         instruction = excluded.instruction,
         status = excluded.status
-    WHERE excluded.status = 1
+    WHERE status = 1
     """, [device_id, instruction, 0])
     con.commit()
     con.close()

@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/time.h>
 #include <netdb.h>
 #include <stdlib.h>
 #include <time.h>
@@ -28,6 +29,9 @@ static uint32_t prefix_to_mask(int prefix_len) {
 
 // returns 0 for open, -1 for nope, 1 for error
 int check_open(char* ip, char* port) {
+	struct timeval tv = {0};
+	tv.tv_sec = 2;
+	tv.tv_usec = 0;
 	int open = -1;
 	struct addrinfo hints;
 	struct addrinfo* serv_addr;
@@ -45,6 +49,9 @@ int check_open(char* ip, char* port) {
 	while (temp->ai_next) {
 		sockfd = socket(temp->ai_family, temp->ai_socktype,
 				temp->ai_protocol);
+
+		setsockopt(sockfd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+		setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
 		if (sockfd < 0) {
 			printf("Port %s is NOT open. Sockfd < 0\n", port);
 		} else {
@@ -61,6 +68,8 @@ int check_open(char* ip, char* port) {
 	}
 	sockfd = socket(temp->ai_family, temp->ai_socktype,
 			temp->ai_protocol);
+		setsockopt(sockfd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+		setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
 	if (sockfd < 0) {
 		printf("Port %s is NOT open. Sockfd < 0 (2)\n", port);
 	} else {
