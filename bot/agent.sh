@@ -29,7 +29,7 @@ while true; do # TODO: fix inside of loop
 		:
 	elif [[ "$CMD" == "load" ]]; then
 		curl -X POST "http://172.18.0.1:8000/busy?device_id="$ID"&busystatus=1"
-		./loader "$IP" 23 testuser.txt testpass.txt 10
+		./loader "$IP" 23 users.txt passwords.txt 10
 		curl -X POST "http://172.18.0.1:8000/busy?device_id="$ID"&busystatus=0"
 		curl -X POST "http://172.18.0.1:8000/inst?device_id="$ID"&status=1"
 	elif [[ "$CMD" == "scan" ]]; then

