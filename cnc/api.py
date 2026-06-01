@@ -18,7 +18,7 @@ import io
 import inspect
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, PlainTextResponse
 from pydantic import BaseModel
 from typing import Any
 
@@ -230,16 +230,21 @@ def post_busy(busystatus: int, device_id: str):
     con.close()
 
 # this is just a transparent way for the agent to access the current instruction in the db for them
-@app.get("/inst")
+@app.get("/inst", response_class=PlainTextResponse)
 def get_inst(device_id: str):
     con = get_con()
-    instruction = con.execute("""
+    row = con.execute("""
         SELECT instruction
         FROM instructions
         WHERE device_id = (?) AND status = 0
     """, [device_id]).fetchone()
     con.close()
-    return instruction
+
+    if row is None or row[0] is None:
+        return "none"
+
+    print(f"returning inst: {row[0]}")
+    return row[0]
 
 @app.post("/inst")
 def post_inst(device_id: str, status: int):
