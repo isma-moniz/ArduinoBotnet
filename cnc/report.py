@@ -79,6 +79,11 @@ def db_insert(device_id, ip, username, password):
             password  = excluded.password,
             last_seen = excluded.last_seen
     """, (device_id, ip, username, password, now, now, 0, 0))
+    con.execute("""
+        UPDATE devices_tobrute
+        SET bruted = 1
+        WHERE ip = ?
+    """, [ip])
     con.commit()
     con.close()
 
@@ -87,7 +92,8 @@ def db_insert_tobrute(ip, scanned_by_ip):
     con.execute("""
         INSERT INTO devices_tobrute (ip, scanned_by_ip, bruted)
         VALUES (?, ?, 0)
-        ON CONFLICT(ip) DO NOTHING
+        ON CONFLICT(ip) DO UPDATE SET
+            scanned_by_ip = excluded.scanned_by_ip
     """, [ip, scanned_by_ip])
     con.commit()
     con.close()
