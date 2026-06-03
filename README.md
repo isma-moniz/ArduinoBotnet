@@ -23,6 +23,10 @@ Scheduling of instructions is done automatically by the dispatcher, which will d
 
 When the botnet has reached a large enough size, running the attack via `python dispatcher <target_ip>` will have ALL the bots curl a get request.
 
+## Architecture
+
+![architecture diagram](architecture_sr.drawio.png)
+
 ## How to run
 
 First make sure you have all the python dependencies, and your docker bridge docker0 (default) is 172.18.0.0.
